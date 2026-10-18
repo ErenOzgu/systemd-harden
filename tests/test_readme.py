@@ -81,3 +81,16 @@ def test_the_readme_says_how_many_directives_there_are():
     # the README need not state a number, but when it does it must be right
     if m:
         assert int(m.group(1)) == len(CATALOGUE)
+
+
+def test_the_committed_real_run_is_made_of_catalogue_directives():
+    from systemd_harden.catalogue import KEYS
+
+    dropin = (ROOT / "examples/demo/real-run/hardening.conf").read_text(encoding="utf-8")
+    keys = {ln.split("=", 1)[0] for ln in dropin.splitlines() if ln and not ln.startswith(("#", "["))}
+    assert keys
+    assert keys <= set(KEYS) | {"ProcSubset", "IPAddressAllow"}, keys - set(KEYS)
+    summary = (ROOT / "examples/demo/real-run/summary.txt").read_text(encoding="utf-8")
+    accepted = [ln for ln in summary.splitlines() if ln.startswith("  accepted")]
+    assert len(accepted) == 27
+    assert "27 of 28 directives kept." in summary

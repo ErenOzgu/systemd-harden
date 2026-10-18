@@ -153,6 +153,9 @@ class FakeSystem:
         if out is not None and out.kind == "start":
             self._running = False
             return Run(1, out.text)
+        if out is not None and out.kind == "start-hang":
+            self._running = False
+            return Run(124, "", timed_out=True)
         return Run(0, "")
 
     def start(self, unit: str, timeout: float) -> Run:

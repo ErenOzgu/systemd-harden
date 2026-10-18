@@ -277,3 +277,26 @@ def test_version(capsys):
         main(["--version"])
     assert e.value.code == 0
     assert capsys.readouterr().out.startswith("systemd-harden 0.1.0")
+
+
+def test_the_summary_lists_accepted_then_dropped_then_rejected_then_skipped(capsys):
+    from systemd_harden.probe import ACCEPTED, DROPPED, REJECTED, SKIPPED, Result, Trial
+    from systemd_harden.report import render_summary
+
+    result = Result(unit="demo.service", systemd_version=255)
+    result.trials = [
+        Trial("A", ("A=1",), SKIPPED, "old"),
+        Trial("B", ("B=1",), REJECTED, "broke"),
+        Trial("C", ("C=1",), DROPPED, "conflict"),
+        Trial("D", ("D=1",), ACCEPTED),
+    ]
+    rows = [ln.split()[0] for ln in render_summary(result).splitlines() if ln.startswith("  ") and ln.strip()]
+    assert [r for r in rows if r != "likely:"] == ["accepted", "dropped", "rejected", "skipped"]
+
+
+def test_the_json_report_has_sorted_keys():
+    from systemd_harden.probe import Result
+    from systemd_harden.report import render_json
+
+    text = render_json(Result(unit="demo.service", systemd_version=255))
+    assert text == json.dumps(json.loads(text), indent=2, sort_keys=True) + "\n"

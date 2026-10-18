@@ -369,3 +369,39 @@ def test_verify_refuses_like_the_probe():
         verify(FakeSystem(), UNIT, ["UMask=0077"], settings(), allow_restart=False)
     with pytest.raises(Refusal):
         verify(FakeSystem(root=False), UNIT, ["UMask=0077"], settings(), allow_restart=True)
+
+
+def test_a_start_that_never_finishes_is_reported_as_a_timeout_not_as_a_failed_start():
+    fake = FakeSystem(breaks={"PrivateTmp=yes": Break("start-hang")})
+    result = run(fake, start_timeout=12)
+    assert "did not finish starting within 12 s" in trial(result, "PrivateTmp").reason
+    assert trial(result, "PrivateTmp").status == REJECTED
+
+
+def test_every_experiment_waits_for_the_settle_time():
+    fake = FakeSystem()
+    start = fake.clock
+    result = run(fake, settle=2.5)
+    assert fake.clock - start == pytest.approx(2.5 * result.restarts)
+
+
+def test_a_systemd_version_that_cannot_be_read_is_refused():
+    with pytest.raises(Refusal, match="systemd version"):
+        run(FakeSystem(version=0))
+
+
+def test_verify_stops_at_the_first_failing_round():
+    fake = FakeSystem(breaks={"ProtectHome=yes": Break("check", "No such file or directory")})
+    ok, *_ = verify(fake, UNIT, ["ProtectHome=yes"], settings(rounds=5), allow_restart=True)
+    assert not ok
+    assert fake.restarts == 1 + 1  # the failing round, and putting the service back
+
+
+def test_the_final_set_is_applied_again_when_the_last_one_tried_was_the_one_dropped():
+    # UMask is the last directive in the table: it is added last, breaks the set and is dropped. The drop-in on
+    # disk then still holds the failing set, so the final check must write the surviving set first.
+    fake = FakeSystem(conflicts=[("NoNewPrivileges=yes", "UMask=0077")])
+    result = run(fake)
+    assert trial(result, "UMask").status == DROPPED
+    assert result.final_ok
+    assert "UMask=0077" not in result.lines()

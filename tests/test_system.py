@@ -185,3 +185,37 @@ def test_huge_output_is_cut(stubs):
 def test_binary_output_does_not_break_decoding(stubs):
     r = stubs.system.run_check(("sh", "-c", "printf '\\377\\376ok'"), 5)
     assert r.out.endswith("ok")
+
+
+def test_is_systemd_and_is_root_ask_the_machine(stubs, monkeypatch):
+    monkeypatch.setattr(os.path, "isdir", lambda p: p != "/run/systemd/system")
+    assert stubs.system.is_systemd() is False
+    monkeypatch.setattr(os.path, "isdir", lambda p: p == "/run/systemd/system")
+    assert stubs.system.is_systemd() is True
+    monkeypatch.setattr(os, "geteuid", lambda: 1000)
+    assert stubs.system.is_root() is False
+    monkeypatch.setattr(os, "geteuid", lambda: 0)
+    assert stubs.system.is_root() is True
+
+
+def test_show_value_matches_the_whole_property_name(stubs):
+    stubs.show.write_text("PrivateTmpFoo=yes\nPrivateTmp=no\n")
+    assert stubs.system.show_value("demo.service", "PrivateTmp") == "no"
+
+
+def test_the_drop_in_is_world_readable_whatever_the_umask(stubs):
+    old = os.umask(0o077)
+    try:
+        stubs.system.write_dropin("demo.service", "[Service]\n")
+    finally:
+        os.umask(old)
+    path = stubs.run_dir / "demo.service.d" / DROPIN_NAME
+    assert stat.S_IMODE(path.stat().st_mode) == 0o644
+
+
+def test_removing_the_drop_in_also_removes_a_half_written_one(stubs):
+    d = stubs.run_dir / "demo.service.d"
+    d.mkdir(parents=True)
+    (d / (DROPIN_NAME + ".tmp")).write_text("[Service]\n")
+    stubs.system.remove_dropin("demo.service")
+    assert not d.exists()

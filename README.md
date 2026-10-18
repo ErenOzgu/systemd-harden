@@ -26,7 +26,7 @@ change at a time, and a record of what broke.
 
 ## Try it
 
-Use a test machine or a VM: the probe restarts the service about forty times. The demo service in this repository is a
+Use a test machine or a VM: the probe restarts the service about thirty-five times. The demo service in this repository is a
 small TCP server whose "features" use things that directives can take away (reading `/home`, writing `/var/lib`, ...).
 
 ```sh
@@ -44,6 +44,110 @@ sudo examples/demo/setup.sh down
 The probe writes its drop-in under `/run`, so a crash can never leave a permanent change, and it puts the service back
 as it found it. The file `hardening.conf` is yours: install it as `/etc/systemd/system/NAME.service.d/10-hardening.conf`
 and run `systemctl daemon-reload && systemctl restart NAME.service`.
+
+## What it prints
+
+This is a real run, not a mock-up: the output of the command above in the `wheel` job of the CI run for commit
+[`ce10f6f`](https://github.com/ErenOzgu/systemd-harden/actions/runs/39112204026), on a GitHub Ubuntu 24.04 runner with
+systemd 255, copied byte for byte into `examples/demo/real-run/` (a test compares this page with those files). The
+summary goes to stderr:
+
+<!-- include:examples/demo/real-run/summary.txt -->
+```
+sdh-demo.service on systemd 255
+
+  accepted  NoNewPrivileges          NoNewPrivileges=yes
+  accepted  PrivateTmp               PrivateTmp=yes
+  accepted  ProtectSystem            ProtectSystem=full
+  accepted  ProtectHome              ProtectHome=read-only
+  accepted  PrivateDevices           PrivateDevices=yes
+  accepted  DevicePolicy             DevicePolicy=closed
+  accepted  ProtectKernelTunables    ProtectKernelTunables=yes
+  accepted  ProtectKernelModules     ProtectKernelModules=yes
+  accepted  ProtectKernelLogs        ProtectKernelLogs=yes
+  accepted  ProtectControlGroups     ProtectControlGroups=yes
+  accepted  ProtectClock             ProtectClock=yes
+  accepted  ProtectHostname          ProtectHostname=yes
+  accepted  ProtectProc              ProtectProc=invisible ProcSubset=pid
+  accepted  RestrictSUIDSGID         RestrictSUIDSGID=yes
+  accepted  RestrictRealtime         RestrictRealtime=yes
+  accepted  RestrictNamespaces       RestrictNamespaces=yes
+  accepted  LockPersonality          LockPersonality=yes
+  accepted  MemoryDenyWriteExecute   MemoryDenyWriteExecute=yes
+  accepted  RemoveIPC                RemoveIPC=yes
+  accepted  RestrictAddressFamilies  RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+  accepted  SystemCallArchitectures  SystemCallArchitectures=native
+  accepted  SystemCallFilter         SystemCallFilter=@system-service SystemCallFilter=~@privileged @resources
+  accepted  CapabilityBoundingSet    CapabilityBoundingSet=
+  accepted  PrivateUsers             PrivateUsers=yes
+  accepted  IPAddressDeny            IPAddressDeny=any IPAddressAllow=localhost
+  accepted  KeyringMode              KeyringMode=private
+  accepted  UMask                    UMask=0077
+  rejected  ProtectSystem            ProtectSystem=strict: the health check failed (exit status 1): fail tmp: OSError: [Errno 30] Read-only file system: '/tmp/sdh-demo-2570'
+                                     likely: the service wrote to a path that is now read-only (ReadWritePaths= or StateDirectory= would allow it)
+  rejected  ProtectHome              ProtectHome=yes: the health check failed (exit status 1): fail home: FileNotFoundError: [Errno 2] No such file or directory: '/home/sdh-demo/data'
+                                     likely: a path the service needs is no longer visible (ProtectHome=, PrivateTmp=, PrivateDevices=, ProtectProc= hide paths)
+  rejected  RestrictAddressFamilies  RestrictAddressFamilies=AF_UNIX: the service is failed/failed (result exit-code, exit status 1) 0.5 s after the start
+                                     likely: the service opened a socket family that RestrictAddressFamilies forbids
+  rejected  PrivateNetwork           PrivateNetwork=yes: the health check failed (exit status 2): cannot reach the service: [Errno 111] Connection refused
+                                     likely: the service's network access changed (IPAddressDeny=, PrivateNetwork=)
+
+27 of 28 directives kept.
+Exposure level by systemd-analyze security (lower is better): 9.6 before, 1.4 with the drop-in.
+The service was restarted 35 times and is back as it was.
+```
+
+Four settings were turned down to a weaker variant or dropped, each for a reason the service itself printed. The
+file it wrote, which is yours to review and install:
+
+<!-- include:examples/demo/real-run/hardening.conf -->
+```ini
+# Written by systemd-harden 0.1.0 for sdh-demo.service (systemd 255).
+# Every directive below was applied to the running service, which was restarted and then passed its
+# health check. Nothing here is a promise about code paths the health check does not exercise.
+# Install it as /etc/systemd/system/sdh-demo.service.d/10-hardening.conf and run:
+#   systemctl daemon-reload && systemctl restart sdh-demo.service
+#
+# Tried and not used:
+#   ProtectSystem=strict: the health check failed (exit status 1): fail tmp: OSError: [Errno 30] Read-only file system: '/tmp/sdh-demo-2570'
+#   ProtectHome=yes: the health check failed (exit status 1): fail home: FileNotFoundError: [Errno 2] No such file or directory: '/home/sdh-demo/data'
+#   RestrictAddressFamilies=AF_UNIX: the service is failed/failed (result exit-code, exit status 1) 0.5 s after the start
+#   PrivateNetwork=yes: the health check failed (exit status 2): cannot reach the service: [Errno 111] Connection refused
+[Service]
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+PrivateDevices=yes
+DevicePolicy=closed
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+CapabilityBoundingSet=
+PrivateUsers=yes
+IPAddressDeny=any
+IPAddressAllow=localhost
+KeyringMode=private
+UMask=0077
+```
+
+The exposure level drops from 9.6 to 1.4 because the demo service needs very little. Another service will keep fewer
+directives, and the demo's health check is what decides what "works" means here, which is why the next section matters.
 
 ## How a probe works
 
@@ -190,6 +294,12 @@ A change that starts using a path the drop-in has made read-only then fails the 
   drop-in left. A skipped live test is a failure in CI.
 - The README is checked against the code: the table of directives is generated from the catalogue, the option
   table lists every option the command line has, and the CI example is the committed file.
+- **A mutation check, run once and by hand** (not in CI, and the script is not in this repository): 67 small changes
+  to the source (a condition turned off, a comparison loosened, a constant changed) were made one at a time in a copy
+  and the tests that need no real systemd were run. Twelve survived the first pass; tests were added for them
+  (a start that never finishes, the settle wait, an unreadable systemd version, the first failing round of `verify`,
+  a drop-in written with a strict umask, the order of the summary, ...) and all 67 are caught now. The checks that
+  only real systemd can answer are covered by the live tests, not by this.
 
 ## What it cannot do
 
@@ -225,7 +335,7 @@ A change that starts using a path the drop-in has made read-only then fails the 
 systemd_harden/    catalogue.py (the directives), probe.py (the algorithm), system.py (systemctl and friends),
                    diagnose.py (failure hints), report.py, cli.py
 tests/             simulated machine, stand-in executables, live tests against real systemd
-examples/demo/     the demo service, its unit and setup.sh
+examples/demo/     the demo service, its unit and setup.sh, and the output of a real run (real-run/)
 examples/ci/       a pull request workflow that runs `verify`
 ```
 
