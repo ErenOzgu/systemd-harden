@@ -1,0 +1,6 @@
+[Unit]
+Description=systemd-harden demo service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/lib/systemd-harden-demo/service.py serve --port 18765

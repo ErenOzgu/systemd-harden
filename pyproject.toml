@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "systemd-harden"
+version = "0.1.0"
+description = "Find out which systemd sandboxing directives a service really survives: apply them one at a time, restart the service, run your health check, and write a drop-in with the ones that passed."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Eren Özgü" }]
+keywords = ["systemd", "hardening", "sandboxing", "linux", "security", "sysadmin", "devops"]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+systemd-harden = "systemd_harden.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["systemd_harden*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"systemd_harden/*" = ["E501"]
+"tests/*" = ["E501"]
+"examples/*" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: needs root and a running systemd (PID 1)"]

@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+      - name: shellcheck
+        run: shellcheck examples/demo/setup.sh
+      - name: actionlint
+        run: |
+          set -euo pipefail
+          v=1.7.7
+          base="https://github.com/rhysd/actionlint/releases/download/v${v}"
+          curl -fsSL -o "actionlint.tgz" "${base}/actionlint_${v}_linux_amd64.tar.gz"
+          curl -fsSL -o "checksums.txt" "${base}/actionlint_${v}_checksums.txt"
+          grep " actionlint_${v}_linux_amd64.tar.gz\$" checksums.txt | sed 's/ actionlint_.*/ actionlint.tgz/' | sha256sum -c -
+          tar -xzf actionlint.tgz actionlint
+          ./actionlint
+          ./actionlint examples/ci/verify.yml
+
+  test:
+    name: Tests (Python ${{ matrix.python }}, simulated machine)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e '.[dev]'
+      - name: Everything that needs no real systemd, as an ordinary user (the live tests are skipped)
+        run: python -m pytest -q -rs -p no:cacheprovider
+
+  live:
+    name: Real systemd (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-22.04, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e '.[dev]'
+      - name: What this machine is
+        run: |
+          set -x
+          uname -r
+          systemctl --version | head -1
+          systemd-analyze --version | head -1 || true
+          id
+          ls -ld /run/systemd/system
+          stat -fc %T /sys/fs/cgroup
+      - name: The live tests, as root, none of them skipped
+        run: |
+          set -euo pipefail
+          sudo -E env "PATH=$PATH" SYSTEMD_HARDEN_REQUIRE_SYSTEMD=1 python -m pytest tests/test_live.py -v -rs -p no:cacheprovider | tee "$RUNNER_TEMP/live.txt"
+          if grep -E "( SKIPPED|[0-9] skipped)" "$RUNNER_TEMP/live.txt"; then echo "::error::live tests were skipped"; exit 1; fi
+      - name: Nothing of the demo or the probe is left behind
+        run: |
+          set -euo pipefail
+          sudo systemctl daemon-reload
+          if systemctl list-unit-files 'sdh-demo*' --no-legend | grep -q .; then echo "::error::the demo unit is still there"; exit 1; fi
+          if ls /run/systemd/system/*.d/zz-systemd-harden-probe.conf 2> /dev/null; then echo "::error::a probe drop-in is left"; exit 1; fi
+
+  wheel:
+    name: The installed command works on a real service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build a wheel and install it into a clean environment, the way a user would
+        run: |
+          set -euo pipefail
+          pip install build
+          python -m build
+          python -m venv "$RUNNER_TEMP/clean"
+          "$RUNNER_TEMP/clean/bin/pip" install dist/*.whl
+          unzip -l dist/*.whl
+          if unzip -l dist/*.whl | grep -q "tests/"; then echo "::error::the wheel contains tests"; exit 1; fi
+      - name: Refusals, from another directory and as an ordinary user
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          sh="$RUNNER_TEMP/clean/bin/systemd-harden"
+          "$sh" --version
+          "$sh" catalogue --markdown | head -3
+          status=0
+          "$sh" probe sdh-demo.service --check true 2> refused.txt || status=$?
+          test "$status" -eq 2
+          grep -q -- "--allow-restart" refused.txt
+          status=0
+          "$sh" probe sdh-demo.service --check true --allow-restart 2> notroot.txt || status=$?
+          test "$status" -eq 3
+          grep -q "run it as root" notroot.txt
+      - name: A real probe with the installed command, as the README shows it
+        run: |
+          set -euo pipefail
+          sh="$RUNNER_TEMP/clean/bin/systemd-harden"
+          sudo examples/demo/setup.sh up
+          cd "$RUNNER_TEMP"
+          sudo "$sh" probe sdh-demo.service --allow-restart --settle 0.5 \
+            --check "python3 /usr/local/lib/systemd-harden-demo/service.py check tmp,home,var" -o "$RUNNER_TEMP/hardening.conf" --json "$RUNNER_TEMP/result.json" 2> "$RUNNER_TEMP/summary.txt"
+          echo "---- summary"; cat "$RUNNER_TEMP/summary.txt"
+          echo "---- drop-in"; cat "$RUNNER_TEMP/hardening.conf"
+          sudo "$sh" verify sdh-demo.service --allow-restart --settle 0.5 --dropin "$RUNNER_TEMP/hardening.conf" \
+            --check "python3 /usr/local/lib/systemd-harden-demo/service.py check tmp,home,var"
+          test "$(systemctl is-active sdh-demo.service)" = active
+          sudo "$GITHUB_WORKSPACE/examples/demo/setup.sh" down

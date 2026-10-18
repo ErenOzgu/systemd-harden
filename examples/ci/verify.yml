@@ -1,0 +1,30 @@
+# A pull request check for a repository that ships a systemd service and its hardening drop-in: install the
+# service the way you deploy it, then prove it still passes its health check with the drop-in applied.
+name: Hardening still holds
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install git+https://github.com/ErenOzgu/systemd-harden
+      - name: Install and start the service
+        run: |
+          sudo install -D -m 0644 deploy/myapp.service /run/systemd/system/myapp.service
+          sudo systemctl daemon-reload
+          sudo systemctl start myapp.service
+      - name: The drop-in still lets it work
+        run: |
+          sudo -E env "PATH=$PATH" systemd-harden verify myapp.service \
+            --dropin deploy/myapp.hardening.conf \
+            --check "curl -fsS http://127.0.0.1:8080/health" \
+            --allow-restart
