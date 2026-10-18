@@ -339,6 +339,11 @@ examples/demo/     the demo service, its unit and setup.sh, and the output of a 
 examples/ci/       a pull request workflow that runs `verify`
 ```
 
+## More
+
+[Design notes](docs/design-notes.md) (why it is built this way, what was rejected, how it was checked),
+[CHANGELOG](CHANGELOG.md) and [ROADMAP](ROADMAP.md).
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
