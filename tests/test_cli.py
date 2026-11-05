@@ -272,6 +272,30 @@ def test_catalogue_lists_every_directive(capsys):
     assert out.count("\n") > 60
 
 
+def test_catalogue_json_has_every_directive_with_its_since_versions(capsys):
+    import json
+
+    from systemd_harden.catalogue import CATALOGUE
+
+    code, out, _, _ = cli(["catalogue", "--json"], capsys=capsys)
+    assert code == 0
+    data = json.loads(out)
+    assert [d["key"] for d in data] == [d.key for d in CATALOGUE]
+    for entry, d in zip(data, CATALOGUE, strict=True):
+        assert entry["why"] == d.why
+        assert [(c["lines"], c["since"]) for c in entry["candidates"]] == [
+            (list(c.lines), c.since) for c in d.candidates
+        ]
+    ps = next(d for d in data if d["key"] == "ProtectSystem")
+    assert ps["candidates"][0] == {"lines": ["ProtectSystem=strict"], "since": 214}
+
+
+def test_catalogue_json_and_markdown_exclude_each_other(capsys):
+    with pytest.raises(SystemExit) as e:
+        main(["catalogue", "--json", "--markdown"])
+    assert e.value.code == 2
+
+
 def test_version(capsys):
     with pytest.raises(SystemExit) as e:
         main(["--version"])

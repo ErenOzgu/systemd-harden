@@ -8,6 +8,7 @@ ignore the line with a warning, which would look like a pass, so the directive i
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 
@@ -219,3 +220,16 @@ def markdown_table() -> str:
         tries = "<br>".join(f"`{' + '.join(c.lines)}`" for c in d.candidates)
         rows.append(f"| `{d.key}` | {tries} | {d.why} |")
     return "\n".join(rows)
+
+
+def as_json() -> str:
+    """The catalogue as JSON, for tools that want the directives and their `since` versions."""
+    data = [
+        {
+            "key": d.key,
+            "why": d.why,
+            "candidates": [{"lines": list(c.lines), "since": c.since} for c in d.candidates],
+        }
+        for d in CATALOGUE
+    ]
+    return json.dumps(data, indent=2, ensure_ascii=False)

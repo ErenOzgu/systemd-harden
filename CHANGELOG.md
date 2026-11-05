@@ -5,6 +5,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer
 ## Unreleased
 
 ### Added
+- `catalogue --json`: the directives, the settings tried and their `since` versions as JSON, for other tools.
 - `docs/design-notes.md`: why the tool is built the way it is, what was rejected, how it was checked, and the
   questions this design usually draws.
 - `ROADMAP.md`: the next small steps, in order.

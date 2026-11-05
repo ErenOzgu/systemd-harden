@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .catalogue import CATALOGUE, KEYS, markdown_table
+from .catalogue import CATALOGUE, KEYS, as_json, markdown_table
 from .probe import BaselineFailed, Refusal, Settings, probe, verify
 from .report import render_dropin, render_json, render_summary
 from .system import RealSystem, System
@@ -143,7 +143,11 @@ def build_parser() -> argparse.ArgumentParser:
     cl.add_argument("--dry-run", action="store_true", help="only list them")
 
     ca = sub.add_parser("catalogue", help="list the directives that are tried, strongest setting first")
-    ca.add_argument("--markdown", action="store_true", help="print the table used in the README")
+    fmt = ca.add_mutually_exclusive_group()
+    fmt.add_argument("--markdown", action="store_true", help="print the table used in the README")
+    fmt.add_argument(
+        "--json", action="store_true", help="print the directives, candidates and `since` versions as JSON"
+    )
     return p
 
 
@@ -172,6 +176,9 @@ def _drop_in_lines(path: Path) -> list[str]:
 def _cmd_catalogue(a: argparse.Namespace) -> int:
     if a.markdown:
         print(markdown_table())
+        return EXIT_OK
+    if a.json:
+        print(as_json())
         return EXIT_OK
     for d in CATALOGUE:
         print(f"{d.key}: {d.why}")

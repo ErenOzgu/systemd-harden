@@ -207,7 +207,7 @@ The directives, strongest setting first:
 | `systemd-harden probe UNIT --check CMD --allow-restart` | Try the directives, write the drop-in to standard output (or `-o FILE`) and a table to standard error. |
 | `systemd-harden verify UNIT --dropin FILE --check CMD --allow-restart` | Apply a drop-in file once more and check the service: a regression test for hardening you already have. |
 | `systemd-harden cleanup` | Remove probe drop-ins that a killed run left under `/run/systemd/system`. |
-| `systemd-harden catalogue` | List the directives and the settings tried. |
+| `systemd-harden catalogue` | List the directives and the settings tried. `--json` prints the same as JSON (`key`, `why`, and per candidate the `lines` and the `since` systemd version); `--markdown` prints the table above. |
 
 Options of `probe` and `verify`:
 

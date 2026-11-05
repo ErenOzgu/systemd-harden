@@ -10,5 +10,5 @@ has a line for it. Each step is meant to be a few hours of work, not a rewrite.
 - [ ] Read list-valued directives back, starting with `RestrictAddressFamilies`: compare `systemctl show` with the
       drop-in on systemd 249 and 255, and say "not verified" where the output format differs
 - [ ] A second search order for the combination step: try table order and reverse order and keep the larger set
-- [ ] `catalogue --json`, for tools that want the table and the `since` versions
+- [x] `catalogue --json`, for tools that want the table and the `since` versions
 - [ ] A live check on a newer systemd than 255 (the README says only 249 and 255 were tried)
