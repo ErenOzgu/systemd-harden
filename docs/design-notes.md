@@ -44,9 +44,10 @@ failures are not at start: a process that dies after loading a plugin looks like
 ### The combination is greedy, and says so
 
 Directives that pass alone can still conflict. The tool first tries them all together; if that fails it adds them one
-by one in table order and drops the ones that break the set, with the reason. A different order could keep a larger
-set. Finding the best subset would mean many more restarts, so the cheap, deterministic rule was chosen and the
-limitation stated.
+by one in table order and drops the ones that break the set, with the reason. If that dropped something it walks the
+list again from the other end and keeps the larger result (table order wins a tie), because which of two conflicting
+directives survives depends only on the order. Other orders could still keep a larger set. Finding the best subset
+would mean many more restarts, so the cheap, deterministic rule was chosen and the limitation stated.
 
 ### A directive that is silently ignored must not look like a pass
 
@@ -90,7 +91,7 @@ request that starts using a path the drop-in made read-only fails in CI, not in 
 ## What would be changed next
 
 See [ROADMAP.md](../ROADMAP.md). In order: newer directives (`PrivateIPC`, `ProtectHome=tmpfs`), reading back list
-values, a second search order for the combination step, and trying a systemd newer than 255.
+values, and trying a systemd newer than 255.
 
 ## Questions this design usually draws
 
@@ -106,8 +107,8 @@ directive newer than the running systemd is skipped, not counted as a pass.
 **What is not covered?** Whatever the health check does not exercise; list-valued settings are not read back; user
 services, sockets and timers are not handled; only Ubuntu 22.04 and 24.04 were tried.
 
-**Why is the combination greedy?** The best subset would cost far more restarts. Table order is deterministic and the
-README states the limit.
+**Why is the combination greedy?** The best subset would cost far more restarts. Table order and its reverse are deterministic
+(the reverse only runs when something was dropped) and the README states the limit.
 
 ## Three-minute demo
 

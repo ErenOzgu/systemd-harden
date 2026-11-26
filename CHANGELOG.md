@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer
 ## Unreleased
 
 ### Added
+- Combination step: when the directives that passed alone conflict and some are dropped, the walk is repeated from
+  the other end of the table and the larger set is kept (table order wins a tie), so the order no longer decides alone
+  which of two conflicting directives survives.
 - `catalogue --json`: the directives, the settings tried and their `since` versions as JSON, for other tools.
 - `docs/design-notes.md`: why the tool is built the way it is, what was rejected, how it was checked, and the
   questions this design usually draws.
