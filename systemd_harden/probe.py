@@ -247,6 +247,18 @@ class Prober:
             tried.append(Trial(directive.key, cand.lines, REJECTED, reason, why))
         return tried
 
+    def _add_one_by_one(self, order: list[Trial]) -> tuple[list[Trial], list[tuple[Trial, str, str]]]:
+        """Add the trials in this order, keeping each one the set still works with; say why the others were dropped."""
+        keep: list[Trial] = []
+        dropped: list[tuple[Trial, str, str]] = []
+        for t in order:
+            ok, reason, why = self.try_lines([ln for k in keep + [t] for ln in k.lines])
+            if ok:
+                keep.append(t)
+            else:
+                dropped.append((t, reason, why))
+        return keep, dropped
+
     def run(self, version: int) -> Result:
         s = self.settings
         result = Result(unit=self.unit, systemd_version=version)
@@ -285,14 +297,19 @@ class Prober:
                 keep = survivors
             else:
                 self.log(f"  together: {reason}; adding them one by one")
-                for t in survivors:
-                    ok, reason, why = self.try_lines([ln for k in keep + [t] for ln in k.lines])
-                    if ok:
-                        keep.append(t)
-                    else:
-                        t.status = DROPPED
-                        t.reason = f"works alone, but not together with the ones before it: {reason}"
-                        t.hint = why
+                keep, dropped = self._add_one_by_one(survivors)
+                if dropped:
+                    # Which of two conflicting directives survives depends on the order, so the same walk is made
+                    # from the other end and the larger set is kept (table order wins a tie).
+                    self.log("  trying again from the other end of the table")
+                    keep_rev, dropped_rev = self._add_one_by_one(survivors[::-1])
+                    if len(keep_rev) > len(keep):
+                        keep, dropped = keep_rev, dropped_rev
+                keep = [t for t in survivors if t in keep]
+                for t, reason, why in dropped:
+                    t.status = DROPPED
+                    t.reason = f"works alone, but not together with the others kept: {reason}"
+                    t.hint = why
         result.final = keep
 
         # 4. The final set, checked again.

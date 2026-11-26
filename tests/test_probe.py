@@ -405,3 +405,25 @@ def test_the_final_set_is_applied_again_when_the_last_one_tried_was_the_one_drop
     assert trial(result, "UMask").status == DROPPED
     assert result.final_ok
     assert "UMask=0077" not in result.lines()
+
+
+def test_when_the_table_order_keeps_fewer_the_other_order_is_tried_and_the_larger_set_kept():
+    # NoNewPrivileges conflicts with both of the others, which do not conflict with each other: table order keeps
+    # one of the three, the reverse order keeps two.
+    fake = FakeSystem(
+        conflicts=[("NoNewPrivileges=yes", "PrivateTmp=yes"), ("NoNewPrivileges=yes", "UMask=0077")]
+    )
+    result = run(fake, only=("NoNewPrivileges", "PrivateTmp", "UMask"))
+    assert trial(result, "NoNewPrivileges").status == DROPPED
+    assert trial(result, "PrivateTmp").status == ACCEPTED
+    assert trial(result, "UMask").status == ACCEPTED
+    assert result.lines() == ["PrivateTmp=yes", "UMask=0077"]  # catalogue order
+    assert "works alone, but not together" in trial(result, "NoNewPrivileges").reason
+    assert result.final_ok
+
+
+def test_a_tie_between_the_two_orders_keeps_the_table_order_result():
+    fake = FakeSystem(conflicts=[("NoNewPrivileges=yes", "PrivateTmp=yes")])
+    result = run(fake, only=("NoNewPrivileges", "PrivateTmp"))
+    assert trial(result, "NoNewPrivileges").status == ACCEPTED
+    assert trial(result, "PrivateTmp").status == DROPPED

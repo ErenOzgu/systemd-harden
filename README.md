@@ -160,6 +160,8 @@ directives, and the demo's health check is what decides what "works" means here,
    counted as a pass.
 3. **Together.** The directives that passed alone are applied together. When that works, that is the answer. When it
    does not, they are added one by one in table order and the ones that break the set are dropped, with the reason.
+   When something was dropped, the same walk is made from the other end of the table and the larger set is kept
+   (table order wins a tie).
 4. **Final check.** The final set is restarted and checked `--rounds` times, and `systemd-analyze security` is asked
    for the exposure level before and after.
 5. **Put back.** The probe drop-in is removed, systemd reloads, and the service is restarted if it was running or
@@ -311,8 +313,9 @@ A change that starts using a path the drop-in has made read-only then fails the 
   not work out `ReadWritePaths=`, `StateDirectory=`, an allow list of system calls or the narrowest capability set.
   When `ProtectSystem=strict` is rejected because the service writes to one directory, the report says so and you can
   add that directory yourself and run the probe again.
-- **The combination search is greedy.** Directives are added in table order, so a different order could keep a
-  different, possibly larger set when two directives conflict. It does not search for the best one.
+- **The combination search is greedy.** Directives are added one by one, in table order and, when that dropped
+  something, in reverse order too, and the larger set is kept. Other orders could still keep a larger set when
+  directives conflict in more complicated ways; it does not search for the best one.
 - **List-valued directives are not read back.** For single-word settings it checks with `systemctl show` that the
   directive really is in effect. `SystemCallFilter`, `RestrictAddressFamilies`, `CapabilityBoundingSet` and
   `IPAddressDeny` are trusted to have been applied when the drop-in was.
