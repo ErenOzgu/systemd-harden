@@ -4,6 +4,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer
 
 ## Unreleased
 
+## 0.2.0 - 2026-11-26
+
 ### Added
 - Combination step: when the directives that passed alone conflict and some are dropped, the walk is repeated from
   the other end of the table and the larger set is kept (table order wins a tie), so the order no longer decides alone

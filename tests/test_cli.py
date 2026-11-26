@@ -3,6 +3,7 @@ import re
 
 import pytest
 
+from systemd_harden import __version__
 from systemd_harden.cli import main
 
 from .fake import Break, FakeSystem
@@ -300,7 +301,7 @@ def test_version(capsys):
     with pytest.raises(SystemExit) as e:
         main(["--version"])
     assert e.value.code == 0
-    assert capsys.readouterr().out.startswith("systemd-harden 0.1.0")
+    assert capsys.readouterr().out.startswith(f"systemd-harden {__version__}")
 
 
 def test_the_summary_lists_accepted_then_dropped_then_rejected_then_skipped(capsys):
