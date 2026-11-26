@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "systemd-harden"
-version = "0.1.0"
+version = "0.2.0"
 description = "Find out which systemd sandboxing directives a service really survives: apply them one at a time, restart the service, run your health check, and write a drop-in with the ones that passed."
 readme = "README.md"
 requires-python = ">=3.11"
